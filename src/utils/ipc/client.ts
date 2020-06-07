@@ -81,7 +81,11 @@ export class IPCClient<
         name,
         args,
       }
-      return ipcRenderer.sendSync(this._syncChannelName, request)
+      const response: ResponsePayload = ipcRenderer.sendSync(this._syncChannelName, request)
+      if (response.state === 'resolved') {
+        return response.value
+      }
+      throw response.value
     }) as unknown as Dethunk<Server[K]>
   }
 

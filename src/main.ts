@@ -1,5 +1,6 @@
 import { app, BrowserWindow } from 'electron'
 import './ipc/server'
+import * as server from './ipc/server'
 import { MaybePromise } from './utils/types'
 
 export interface MainOptions {
@@ -32,15 +33,7 @@ export async function main(options: MainOptions) {
   createWindow()
 
   async function createWindow() {
-    const win = new BrowserWindow({
-      width: 1280,
-      height: 720,
-      frame: false,
-      titleBarStyle: 'customButtonsOnHover',
-      webPreferences: {
-        nodeIntegration: true,
-      },
-    })
+    const win = server.createWindow()
 
     await options?.interceptors?.afterCreateWindow?.(win)
 
