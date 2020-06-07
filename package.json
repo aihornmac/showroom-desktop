@@ -1,0 +1,70 @@
+{
+  "name": "showroom-desktop",
+  "version": "0.0.1",
+  "description": "A showroom desktop",
+  "bin": "bin.js",
+  "scripts": {
+    "start": "electron tools/register.js",
+    "build": "ts-node -T --project tsconfig.json tools/build.ts",
+    "tsc": "tsc --noEmit -p src/tsconfig.build.json",
+    "test": "mocha -r ts-node/register/transpile-only **/__tests__/**/*.test.ts",
+    "try": "node -r ts-node/register/transpile-only tools/bin.ts",
+    "spike": "node -r ts-node/register/transpile-only tools/spike.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aihornmac/showroom-desktop.git"
+  },
+  "files": [
+    "lib"
+  ],
+  "keywords": [
+    "showroom",
+    "desktop",
+    "gui"
+  ],
+  "author": "Aihorn Mac",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/aihornmac/showroom-desktop/issues"
+  },
+  "homepage": "https://github.com/aihornmac/showroom-desktop#readme",
+  "devDependencies": {
+    "@types/chalk": "^2.2.0",
+    "@types/date-fns": "^2.6.0",
+    "@types/electron": "^1.6.10",
+    "@types/happypack": "^5.0.0",
+    "@types/html-webpack-plugin": "^3.2.3",
+    "@types/react": "^16.9.35",
+    "@types/react-dom": "^16.9.8",
+    "@types/speed-measure-webpack-plugin": "^1.3.0",
+    "@types/styled-components": "^5.1.0",
+    "@types/uuid": "^8.0.0",
+    "@types/webpack": "^4.41.17",
+    "@types/webpack-dev-server": "^3.11.0",
+    "@types/webpack-merge": "^4.1.5",
+    "@typescript-eslint/eslint-plugin": "^3.1.0",
+    "@typescript-eslint/parser": "^3.1.0",
+    "axios": "^0.19.2",
+    "chalk": "^4.0.0",
+    "css-loader": "^3.5.3",
+    "date-fns": "^2.14.0",
+    "electron": "^9.0.2",
+    "eslint": "^7.2.0",
+    "eslint-plugin-react": "^7.20.0",
+    "happypack": "^5.0.1",
+    "html-webpack-plugin": "^4.3.0",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1",
+    "speed-measure-webpack-plugin": "^1.3.3",
+    "style-loader": "^1.2.1",
+    "styled-components": "^5.1.1",
+    "ts-loader": "^7.0.5",
+    "ts-node": "^8.10.2",
+    "typescript": "^3.9.3",
+    "uuid": "^8.1.0",
+    "webpack": "^4.43.0",
+    "webpack-dev-server": "^3.11.0",
+    "webpack-merge": "^4.2.2"
+  }
+}
