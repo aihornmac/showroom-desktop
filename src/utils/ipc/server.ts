@@ -1,10 +1,8 @@
 import { ipcMain, IpcMainEvent, WebContents } from 'electron'
-import { EventEmitter } from 'events'
 import {
   IPCCommonOptions,
   DEFAULT_IPC_CHANNEL_NAME,
   Payload,
-  MessagePayload,
   RequestPayload,
   ResponsePayload,
   Dethunk,
@@ -22,7 +20,7 @@ type Thenable = { readonly then: Function }
 
 export type SyncAPIKeysOf<T> = string & keyof T & {
   [P in keyof T]: (
-    T[P] extends (event: IpcMainEvent, method: 'sync' | 'async') => (...args: unknown[]) => infer R ? (
+    T[P] extends (event: IpcMainEvent, method: 'sync' | 'async') => (...args: infer _A) => infer R ? (
       // return type of function is unknown or any or never should be reguarded as sync
       unknown extends R ? P :
       R extends never ? P :
@@ -35,7 +33,7 @@ export type SyncAPIKeysOf<T> = string & keyof T & {
 
 export type AsyncAPIKeysOf<T> = string & keyof T & {
   [P in keyof T]: (
-    T[P] extends (event: IpcMainEvent, method: 'sync' | 'async') => (...args: unknown[]) => infer R ? (
+    T[P] extends (event: IpcMainEvent, method: 'sync' | 'async') => (...args: infer _A) => infer R ? (
       // return type of function is unknown or any or never should be reguarded as async
       unknown extends R ? P :
       R extends never ? P :
@@ -57,13 +55,11 @@ export class IPCServer<
   private _api: API
   private _nextRequestId: number
   private _requests: Map<number, ExternalPromise>
-  private _events: EventEmitter
 
   constructor(options: IPCCommonOptions<API>) {
     this._isDestroyed = false
     this._nextRequestId = 0
     this._requests = new Map()
-    this._events = new EventEmitter()
     this._api = options.api
     this._channelName = options.channelName || DEFAULT_IPC_CHANNEL_NAME
     this._syncChannelName = `${this._channelName}:sync`
@@ -86,14 +82,6 @@ export class IPCServer<
     this._isDestroyed = true
     ipcMain.removeListener(this._syncChannelName, this._dispatchSync)
     ipcMain.removeListener(this._asyncChannelName, this._dispatchAsync)
-  }
-
-  send(sender: WebContents, message: unknown) {
-    const payload: MessagePayload = {
-      kind: 'message',
-      data: message,
-    }
-    sender.send(this._asyncChannelName, payload)
   }
 
   request<K extends ClientAPIKeysOf<Client>>(sender: WebContents, name: K): Dethunk<Client[K]> {
@@ -120,19 +108,12 @@ export class IPCServer<
   }
 
   private _dispatchAsync(event: IpcMainEvent, input: unknown) {
-    console.log(event, input)
     const payload = input as Payload
-    if (payload.kind === 'message') {
-      this._onMessage(payload.data)
-    } else if (payload.kind === 'request') {
+     if (payload.kind === 'request') {
       this._onRequest('async', event, payload)
     } else if (payload.kind === 'response') {
       this._onResponse(payload)
     }
-  }
-
-  private _onMessage(data: unknown) {
-    this._events.emit('message', data)
   }
 
   private _onRequest(
@@ -155,7 +136,9 @@ export class IPCServer<
             state: 'resolved',
             value,
           }
-          event.reply(this._asyncChannelName, response)
+          if (!event.sender.isDestroyed()) {
+            event.reply(this._asyncChannelName, response)
+          }
         }, error => {
           const response: ResponsePayload = {
             kind: 'response',
@@ -163,7 +146,9 @@ export class IPCServer<
             state: 'rejected',
             value: error,
           }
-          event.reply(this._asyncChannelName, response)
+          if (!event.sender.isDestroyed()) {
+            event.reply(this._asyncChannelName, response)
+          }
         })
       } else {
         const response: ResponsePayload = {
@@ -172,10 +157,12 @@ export class IPCServer<
           state: 'resolved',
           value: result,
         }
-        if (method === 'sync') {
-          event.returnValue = response
-        } else {
-          event.reply(this._asyncChannelName, response)
+        if (!event.sender.isDestroyed()) {
+          if (method === 'sync') {
+            event.returnValue = response
+          } else {
+            event.reply(this._asyncChannelName, response)
+          }
         }
       }
     } catch (e) {
@@ -185,10 +172,12 @@ export class IPCServer<
         state: 'rejected',
         value: e,
       }
-      if (method === 'sync') {
-        event.returnValue = response
-      } else {
-        event.reply(response)
+      if (!event.sender.isDestroyed()) {
+        if (method === 'sync') {
+          event.returnValue = response
+        } else {
+          event.reply(response)
+        }
       }
     }
   }

@@ -8,11 +8,6 @@ export interface IPCCommonOptions<API extends {}> {
 export type Dethunk<T> = T extends (...args: infer _A) => infer R ? R : never
 
 export type Payload = (
-  | APIPayload
-  | MessagePayload
-)
-
-export type APIPayload = (
   | RequestPayload
   | ResponsePayload
 )
@@ -29,9 +24,4 @@ export interface ResponsePayload {
   readonly id: number
   readonly state: 'resolved' | 'rejected'
   readonly value: unknown
-}
-
-export interface MessagePayload {
-  readonly kind: 'message'
-  readonly data: unknown
 }

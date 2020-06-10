@@ -31,5 +31,14 @@ export function get(): webpack.Configuration {
     },
 
     stats: 'normal',
+
+    module: {
+      rules: [
+        {
+          test: /\.css$/,
+          use: ['style-loader', 'css-loader']
+        }
+      ],
+    }
   })
 }

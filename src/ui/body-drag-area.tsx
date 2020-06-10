@@ -6,6 +6,8 @@ import { IconWinMinimize, IconWinMaximize, IconWinClose } from './icons'
 export const BodyDragArea = React.memo(() => {
   const onDoubleClick = React.useMemo(() => () => ipc.sync('toggleMaximize')(), [])
 
+  console.log(ipc.sync('getLocale')())
+
   const platform = getPlatform()
 
   return (
@@ -26,8 +28,6 @@ const Bar = React.memo(() => {
   const iconClose = <IconWinClose />
 
   const platform = getPlatform()
-
-  console.log({ platform })
 
   const isMinimizable = getIsMinimizable()
   const isMaximizable = getIsMaximizable() && getIsResizable() || true

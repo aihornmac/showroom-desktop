@@ -8,8 +8,9 @@ export const projectPath = path.join(__dirname, '..')
 export const sourcePath = path.join(projectPath, 'src')
 export const uiPath = path.join(sourcePath, 'ui')
 export const entryPath = path.join(uiPath, 'entry.tsx')
+export const tsConfigPath = path.join(sourcePath, 'tsconfig.ui.build.json')
 
-export const outputPath = path.join(projectPath, 'tmp')
+export const outputPath = path.join(projectPath, 'tmp', 'ui')
 
 export const smp = new SpeedMeasurePlugin({
   disable: !process.env.MEASURE
@@ -49,23 +50,6 @@ function getWebpackConfig(): webpack.Configuration {
           use: 'happypack/loader?id=ts',
           include: (m) => !m.includes('node_modules'),
         },
-        {
-          test: /worker\/browser\.(t|j)sx?$/,
-          use: [
-            {
-              loader: 'worker-loader',
-              options: {
-                inline: false
-              }
-            },
-            'happypack/loader?id=ts'
-          ],
-          exclude: /node_modules/
-        },
-        {
-          test: /\.css$/,
-          use: ['style-loader', 'css-loader']
-        }
       ]
     },
 
@@ -82,7 +66,8 @@ function getWebpackConfig(): webpack.Configuration {
             options: {
               happyPackMode: true,
               transpileOnly: true,
-              configFile: path.join(__dirname, 'tsconfig.build.json'),
+              // configFile: path.join(__dirname, 'tsconfig.ui.build.json'),
+              configFile: tsConfigPath,
             }
           }
         ],

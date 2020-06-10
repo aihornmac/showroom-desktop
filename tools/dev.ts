@@ -5,14 +5,14 @@ import * as os from 'os'
 import type { AddressInfo } from 'net'
 import type { Server } from 'http'
 import * as WebpackDevServer from 'webpack-dev-server'
-import { app, session } from 'electron'
+import { app, session, dialog } from 'electron'
 import { get } from './webpack.ui.dev'
 
-import { run } from './common'
 import { main } from '../src/main'
 import { predicate } from '../src/utils/js'
 import { exists } from '../src/utils/fs'
 import { niceToHave } from '../src/utils/flow-control'
+import { windowManager } from '../src/modules/window'
 
 const EXTENSION_PATH = path.join(os.homedir(), `Library/Application Support/Google/Chrome/Default/Extensions`)
 
@@ -53,14 +53,11 @@ async function bootstrap() {
     })
   })
 
-  await main({
-    url,
-    interceptors: {
-      afterCreateWindow(win) {
-        win.webContents.openDevTools()
-      },
-    }
+  windowManager.intercept('afterCreateWindow', win => {
+    win.webContents.openDevTools()
   })
+
+  await main({ url: { kind: 'url', value: url } })
 }
 
 function stringifyAddress(address: AddressInfo | string) {
@@ -84,4 +81,18 @@ async function getExtensionPath(id: string) {
   }
   // return reactPath
   return
+}
+
+async function run<T>(fn: () => T | PromiseLike<T>): Promise<void> {
+  try {
+    await fn()
+  } catch (e) {
+    console.error(e)
+    try {
+      dialog.showErrorBox('Boostrap Error', String(e))
+    } catch (e) {
+      console.error(e)
+    }
+    process.exit(1)
+  }
 }

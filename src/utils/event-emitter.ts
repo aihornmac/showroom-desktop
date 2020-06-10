@@ -1,18 +1,26 @@
 export interface EventEmitterMapLike {
-  readonly [K: string]: (...args: unknown[]) => unknown
+  readonly [K: string]: Function
 }
 
-export interface EventEmitterListener<T extends EventEmitterMapLike> {
+export interface EventEmitterCommon<T extends EventEmitterMapLike> extends EventEmitterListenerCommon<T>, EventEmitterEmitterCommon<T> {}
+
+export interface EventEmitterListenerCommon<T extends EventEmitterMapLike> {
   on<K extends keyof T>(name: K, fn: T[K]): this
   once<K extends keyof T>(name: K, fn: T[K]): this
-  off<K extends keyof T>(name?: K, fn?: Function): this
+  off<K extends keyof T>(name?: K, fn?: T[K]): this
+}
+
+export interface EventEmitterEmitterCommon<T extends EventEmitterMapLike> {
+  emit<K extends keyof T>(name: K, ...args: Params<T[K]>): number
+}
+
+export interface EventEmitterListener<T extends EventEmitterMapLike> extends EventEmitterListenerCommon<T> {
   count<K extends keyof T>(name: K): number
   subscribe<K extends keyof T>(name: K, fn: T[K]): () => void
 }
 
-export interface EventEmitterEmitter<T extends EventEmitterMapLike> {
-  emit<K extends keyof T>(name: K, ...args: Parameters<T[K]>): number
-  emitIterable<K extends keyof T>(name: K, ...args: Parameters<T[K]>): IterableIterator<undefined>
+export interface EventEmitterEmitter<T extends EventEmitterMapLike> extends EventEmitterEmitterCommon<T> {
+  emitIterable<K extends keyof T>(name: K, ...args: Params<T[K]>): IterableIterator<undefined>
 }
 
 export class EventEmitter<T extends EventEmitterMapLike = EventEmitterMapLike>
@@ -70,7 +78,7 @@ export class EventEmitter<T extends EventEmitterMapLike = EventEmitterMapLike>
     }
   }
 
-  emit<K extends keyof T>(name: K, ...args: Parameters<T[K]>) {
+  emit<K extends keyof T>(name: K, ...args: Params<T[K]>) {
     let count = 0
     for (const __ of this.emitIterable(name, ...args)) {
       count++
@@ -78,7 +86,7 @@ export class EventEmitter<T extends EventEmitterMapLike = EventEmitterMapLike>
     return count
   }
 
-  *emitIterable<K extends keyof T>(name: K, ...args: Parameters<T[K]>) {
+  *emitIterable<K extends keyof T>(name: K, ...args: Params<T[K]>) {
     const list = this._events[name]
     if (list) {
       for (let i = 0; i < list.length; i++) {
@@ -96,3 +104,5 @@ export class EventEmitter<T extends EventEmitterMapLike = EventEmitterMapLike>
     }
   }
 }
+
+type Params<T extends Function> = T extends (...args: infer A) => infer _R ? A : unknown[]

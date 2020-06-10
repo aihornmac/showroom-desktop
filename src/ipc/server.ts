@@ -1,12 +1,15 @@
-import { BrowserWindow, IpcMainEvent, screen } from 'electron'
+import { BrowserWindow, IpcMainEvent, app } from 'electron'
 import * as fs from 'fs'
+import * as path from 'path'
 import * as os from 'os'
-import { Client } from '../showroom/api/client'
-import * as sr from '../showroom/api'
+import { Client } from '../modules/showroom-api/client'
+import * as sr from '../modules/showroom-api'
 import type { API as ClientAPI } from './client'
 import { exists } from '../utils/fs'
 import { niceToHave } from '../utils/flow-control'
 import { IPCServer } from '../utils/ipc/server'
+import { windowManager } from '../modules/window'
+import { getRequestCachePath } from '../modules/app'
 
 class API {
   client = new Client()
@@ -14,6 +17,12 @@ class API {
   getPlatform() {
     return () => {
       return os.platform()
+    }
+  }
+
+  getLocale() {
+    return () => {
+      return app.getLocale()
     }
   }
 
@@ -90,9 +99,10 @@ class API {
 
   getLiveOnlines() {
     return async () => {
-      const filePath = `/Users/aihornmac/Documents/工作文档/github/showroom-desktop/docs/showroom-api-response/live-onlines.json`
+      const filePath = path.join(getRequestCachePath(), 'live-onlines.json')
       const requestAndWrite = niceToHave(async () => {
         const result = await sr.getLiveOnlines(this.client)
+        await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
         await fs.promises.writeFile(filePath, JSON.stringify(result, null, 2))
         console.log('getLiveOnlines updated')
         return result
@@ -105,9 +115,11 @@ class API {
 
   getTimeTables() {
     return async () => {
-      const filePath = `/Users/aihornmac/Documents/工作文档/github/showroom-desktop/docs/showroom-api-response/time-table.json`
+      const filePath = path.join(getRequestCachePath(), 'time-table.json')
+      console.log({ filePath })
       const requestAndWrite = niceToHave(async () => {
         const result = await sr.getTimeTables(this.client)
+        await fs.promises.mkdir(path.dirname(filePath), { recursive: true })
         await fs.promises.writeFile(filePath, JSON.stringify(result, null, 2))
         console.log('getTimeTables updated')
         return result
@@ -120,44 +132,16 @@ class API {
 
   openRoom() {
     return async (roomId: number) => {
-
+      windowManager.openRoomPlayer(roomId)
     }
   }
 }
-
-export type Message = (
-  | never
-)
 
 export type { API }
 
 const api = new API()
 
-export const ipc = new IPCServer<API, ClientAPI>({ api })
-
-export function createWindow() {
-  const { width, height } = getGoodWindowDimension()
-  return new BrowserWindow({
-    width,
-    height,
-    frame: false,
-    titleBarStyle: 'customButtonsOnHover',
-    webPreferences: {
-      nodeIntegration: true,
-    },
-  })
-}
-
-const WINDOW_MIN_WIDTH = 480
-const WINDOW_MIN_HEIGHT = 270
-const WINDOW_DEFAULT_WIDTH = 1280
-const WINDOW_DEFAULT_HEIGHT = 720
-
-function getGoodWindowDimension() {
-  const { width, height } = screen.getPrimaryDisplay().workAreaSize
-  const scale = Math.min(1, width / WINDOW_DEFAULT_WIDTH * .8, height / WINDOW_DEFAULT_HEIGHT * .8)
-  return {
-    width: Math.min(width, Math.max(WINDOW_MIN_WIDTH, WINDOW_DEFAULT_WIDTH * scale)),
-    height: Math.min(height, Math.max(WINDOW_MIN_HEIGHT, WINDOW_DEFAULT_HEIGHT * scale)),
-  }
-}
+export const ipc = new IPCServer<API, ClientAPI>({
+  api,
+  channelName: 'common api',
+})

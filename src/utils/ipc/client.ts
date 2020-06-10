@@ -1,10 +1,8 @@
 import { ipcRenderer, IpcRendererEvent } from 'electron'
-import { EventEmitter } from '../event-emitter'
 import {
   IPCCommonOptions,
   DEFAULT_IPC_CHANNEL_NAME,
   Payload,
-  MessagePayload,
   RequestPayload,
   ResponsePayload,
   Dethunk,
@@ -15,7 +13,7 @@ import { createExternalPromise, ExternalPromise } from '../js'
 type MethodFn = (event: IpcRendererEvent) => Function
 
 export type APIKeysOf<T> = string & keyof T & {
-  [P in keyof T]: T[P] extends (event: IpcRendererEvent) => (...args: unknown[]) => infer R ? (
+  [P in keyof T]: T[P] extends (event: IpcRendererEvent) => (...args: infer _A) => infer R ? (
     // return type of function is unknown or any or never should be reguarded as async
     unknown extends R ? P :
     R extends never ? P :
@@ -36,13 +34,11 @@ export class IPCClient<
   private _api: API
   private _nextRequestId: number
   private _requests: Map<number, ExternalPromise>
-  private _events: EventEmitter
 
   constructor(options: IPCCommonOptions<API>) {
     this._isDestroyed = false
     this._nextRequestId = 0
     this._requests = new Map()
-    this._events = new EventEmitter()
     this._api = options.api
     this._channelName = options.channelName || DEFAULT_IPC_CHANNEL_NAME
     this._syncChannelName = `${this._channelName}:sync`
@@ -62,14 +58,6 @@ export class IPCClient<
     if (this._isDestroyed) return
     this._isDestroyed = true
     ipcRenderer.removeListener(this._asyncChannelName, this._dispatchAsync)
-  }
-
-  send(message: unknown) {
-    const payload: MessagePayload = {
-      kind: 'message',
-      data: message,
-    }
-    ipcRenderer.send(this._asyncChannelName, payload)
   }
 
   sync<K extends SyncAPIKeysOf<Server>>(name: K): Dethunk<Server[K]> {
@@ -107,17 +95,11 @@ export class IPCClient<
 
   private _dispatchAsync(event: IpcRendererEvent, input: unknown) {
     const payload = input as Payload
-    if (payload.kind === 'message') {
-      this._onMessage(payload.data)
-    } else if (payload.kind === 'request') {
+    if (payload.kind === 'request') {
       this._onRequest(event, payload)
     } else if (payload.kind === 'response') {
       this._onResponse(payload)
     }
-  }
-
-  private _onMessage(data: unknown) {
-    this._events.emit('message', data)
   }
 
   private async _onRequest(

@@ -12,7 +12,10 @@ export type { API }
 
 const api = new API()
 
-export const ipc = new IPCClient<API, ServerAPI>({ api })
+export const ipc = new IPCClient<API, ServerAPI>({
+  api,
+  channelName: 'common api',
+})
 
 export const getPlatform = once(() => ipc.sync('getPlatform')())
 

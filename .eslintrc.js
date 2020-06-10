@@ -39,6 +39,8 @@ function getConfig() {
       "@typescript-eslint/no-namespace": 0,
       "@typescript-eslint/ban-types": 0,
       "@typescript-eslint/no-non-null-assertion": 0,
+      "@typescript-eslint/no-empty-interface": 0,
+      "@typescript-eslint/no-unused-vars": 0,
     },
   }
 }

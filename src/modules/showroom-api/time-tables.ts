@@ -1,5 +1,5 @@
 import Axios from 'axios'
-import { API_PREFIX } from './common'
+import { API_URL } from './common'
 import { Client } from './client'
 import { getDayStartTimstamp } from '../../utils/time'
 
@@ -12,7 +12,7 @@ export async function getTimeTables(
   _client: Client,
   options?: GetTimeTables.Options,
 ): Promise<GetTimeTables.Response> {
-  const url = `${API_PREFIX}/time_table/time_tables`
+  const url = `${API_URL}/time_table/time_tables`
 
   const order = options?.order || 'asc'
   const started_at = Math.floor((options?.startedAt || getDayStartTimstamp(Date.now())) / 1000)
