@@ -35,3 +35,36 @@ export interface TypedEventEmitterEmitter<T extends EventEmitterMapLike> {
 }
 
 export type Params<T extends Function> = T extends (...args: infer A) => infer _R ? A : unknown[]
+
+export type FalseLike = null | undefined | void | false | 0 | ''
+
+/** Object types that should never be mapped */
+type AtomicObject =
+  | Function
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | Map<any, any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | WeakMap<any, any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | Set<any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | WeakSet<any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | Promise<any>
+  | Date
+  | RegExp
+  | Boolean
+  | Number
+  | String
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type WeakReferences = WeakMap<any, any> | WeakSet<any>
+
+export type Draft<T> = (
+  T extends AtomicObject? T :
+  T extends ReadonlyMap<infer K, infer V> ? Map<Draft<K>, Draft<V>> : // Map extends ReadonlyMap
+	T extends ReadonlySet<infer V> ? Set<Draft<V>> : // Set extends ReadonlySet
+  T extends WeakReferences ? T :
+  T extends object ? {-readonly [K in keyof T]: Draft<T[K]>} :
+  T
+)

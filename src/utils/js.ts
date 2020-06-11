@@ -1,4 +1,4 @@
-import { ObjectKeyOf } from './types'
+import { ObjectKeyOf, MaybePromise } from './types'
 
 export interface ExternalPromise<T = unknown> {
   promise: Promise<T>
@@ -65,4 +65,75 @@ export function times<T>(n: number, map: (i: number) => T) {
     arr[i] = map(i)
   }
   return arr
+}
+
+export function isPlainObject(value: unknown): value is { [k: string]: unknown } {
+  if (value === null || typeof value !== 'object') return false
+  const proto: unknown = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
+export function createSequancePromise<T = void>() {
+  let prev = Promise.resolve()
+  let currentCount = 0
+  return function then(cb: (index: number) => MaybePromise<T>) {
+    const index = currentCount++
+    const promise = prev.then(() => cb(index))
+    prev = promise.then(noop, console.error)
+    return promise
+  }
+}
+
+export const noop = () => {}
+
+
+/**
+ * determine whether two objects are shallowly euqal
+ * - applies only to plain object
+ * @param a
+ * @param b
+ */
+export function isEqualShallow(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a !== typeof b) return false
+  if (
+    typeof a === 'string' ||
+    typeof a === 'number' ||
+    typeof a === 'boolean' ||
+    typeof a === 'symbol' ||
+    typeof a === 'function' ||
+    typeof a === 'bigint'
+  ) {
+    return false
+  }
+  if (Array.isArray(a)) {
+    if (!Array.isArray(b)) return false
+    if (a.length !== b.length) return false
+    const len = a.length
+    for (let i = 0; i < len; i++) {
+      if (a[i] !== b[i]) return false
+    }
+    return true
+  }
+  if (!(typeof a === 'object' && typeof b === 'object' && a && b)) {
+    return false
+  }
+  if (!isPlainObject(a) || !isPlainObject(b)) return false
+  // a is plain object and b is plain object
+  const keys: { [index: string]: number } = {}
+  for (const key of Object.keys(a)) {
+    keys[key] = 1
+  }
+  for (const key of Object.keys(b)) {
+    keys[key] = (keys[key] || 0) + 1
+  }
+  for (const count of Object.values(keys)) {
+    if (count < 2) return false
+  }
+  for (const key of Object.keys(a)) {
+    if ((a as { [key: string]: unknown })[key] !== (b as { [key: string]: unknown })[key]) {
+      return false
+    }
+  }
+  return true
 }

@@ -21,7 +21,6 @@ export const RoomCard = React.memo((props: {
   const roomIdRef = useBoxedValue(id)
 
   const onEnter = React.useMemo(() => () => {
-    console.log(roomIdRef.current)
     ipc.async('openRoom')(roomIdRef.current)
   }, [])
 

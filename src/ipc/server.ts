@@ -97,6 +97,25 @@ class API {
     }
   }
 
+  fullscreen(event: IpcMainEvent) {
+    return (value: boolean) => {
+      BrowserWindow.fromWebContents(event.sender)!.setFullScreen(value)
+    }
+  }
+
+  toggleFullscreen(event: IpcMainEvent) {
+    return () => {
+      const contents = BrowserWindow.fromWebContents(event.sender)!
+      return contents.setFullScreen(!contents.isFullScreen())
+    }
+  }
+
+  isFullscreen(event: IpcMainEvent) {
+    return () => {
+      return BrowserWindow.fromWebContents(event.sender)!.isFullScreen()
+    }
+  }
+
   getLiveOnlines() {
     return async () => {
       const filePath = path.join(getRequestCachePath(), 'live-onlines.json')

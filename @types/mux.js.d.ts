@@ -22,7 +22,11 @@ declare module 'mux.js' {
 
     export interface Transmuxer {
       on(event: 'data', cb: (segment: Segment) => void): void
+      on(event: 'error', cb: (error: unknown) => void): void
+
       off(event: 'data', cb?: (segment: Segment) => void): void
+      off(event: 'error', cb?: (error: unknown) => void): void
+
       push(typedArray: Uint8Array): void
       flush(): void
     }

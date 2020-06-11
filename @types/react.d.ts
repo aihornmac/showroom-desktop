@@ -6,4 +6,8 @@ declare module 'react' {
   export interface CSSProperties extends React.CSSProperties {
     WebkitAppRegion?: 'drag' | 'no-drag'
   }
+
+  export interface SVGElement extends React.SVGElement {
+    beginElement(): this
+  }
 }

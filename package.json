@@ -68,6 +68,8 @@
     "hls.js": "^0.13.2",
     "html-webpack-plugin": "^4.3.0",
     "mini-css-extract-plugin": "^0.9.0",
+    "mobx": "^5.15.4",
+    "mobx-react": "^6.2.2",
     "mux.js": "^5.6.2",
     "react": "^16.13.1",
     "react-dom": "^16.13.1",
@@ -86,5 +88,9 @@
     "webpack-cli": "^3.3.11",
     "webpack-dev-server": "^3.11.0",
     "webpack-merge": "^4.2.2"
+  },
+  "dependencies": {
+    "@types/js-base64": "^2.3.1",
+    "js-base64": "^2.5.2"
   }
 }

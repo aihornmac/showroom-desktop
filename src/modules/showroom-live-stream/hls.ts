@@ -35,6 +35,7 @@ export type HLSLog = {
   readonly url: string
   readonly confident: boolean
   readonly retries: number
+  readonly duration: number
 }
 
 export type HLSError = {
@@ -165,6 +166,14 @@ export class HLS {
         fs.promises.mkdir(playListsPath, { recursive: true }),
         fs.promises.mkdir(chunksPath, { recursive: true }),
       ])
+      const map = this._chunkFileNameMap
+      const filnames = await fs.promises.readdir(chunksPath)
+      for (const filename of filnames) {
+        const idMatch = filename.match(/([0-9]+?)\.ts$/)
+        if (!idMatch) continue
+        const id = +idMatch[1]
+        map.set(id, filename)
+      }
       this._initState = 'resolved'
       return 'resolved'
     } catch (e) {
@@ -380,6 +389,7 @@ export class HLS {
       await Promise.all(times(length, async i => {
         const id = rightId - i
         if (this._isChunkExisted(id)) return
+        await later(i * 20)
         const url = getHeuristicChunkUrl(id)
         return this._downloadChunk(id, url, confident)
       }))
@@ -446,6 +456,7 @@ class ChunkDownload {
   }
 
   private async _run() {
+    const t0 = Date.now()
     const buffer = await useBinaryExponentialBackoffAlgorithm(async (duration, retries) => {
       if (duration > 4000) {
         this._events.emit('log', {
@@ -454,6 +465,7 @@ class ChunkDownload {
           url: this.url,
           confident: this.confident,
           retries,
+          duration: Date.now() - t0,
         })
       }
       return this._fetchBuffer()

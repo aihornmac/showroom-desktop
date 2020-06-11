@@ -1,82 +1,259 @@
 // This file describes a Media Source Extension for sliced mpeg2-ts file
 import * as muxjs from 'mux.js'
 
-import { call } from '../../utils/js'
-import { Stream, mergeStreamResults } from '../../utils/stream'
+import { ExternalPromise, createExternalPromise } from '../../utils/js'
+import { PipeStream } from '../../utils/stream'
 
 export class MSE {
   readonly url: string
 
-  private _ms: MediaSource
-  private _sb!: SourceBuffer
-  private _transmuxer: muxjs.mp4.Transmuxer
-  private _muxStream: Stream<Uint8Array>
-  private _addSourceIdle: Stream<void>
-  private _count: number
+  private readonly _ms: MediaSource
+  private _sb?: SourceBuffer
+  private _addSourceIdlePromise?: ExternalPromise<void>
   private _isDestroyed: boolean
+  private readonly _sourceOpenPromise: Promise<void>
+  private _demuxer: Demuxer
+  private _loopId: number
 
   constructor() {
     const ms = this._ms = new MediaSource()
     const url = this.url = URL.createObjectURL(ms)
 
-    this._count = 0
     this._isDestroyed = false
+    this._loopId = 0
+
+    this._demuxer = new Demuxer()
+
+    const sourceOpenXp = createExternalPromise<void>()
+    this._sourceOpenPromise = sourceOpenXp.promise
+
+    const onSourceOpen = () => {
+      ms.removeEventListener('sourceopen', onSourceOpen)
+      URL.revokeObjectURL(url)
+      if (this._isDestroyed) return
+      const mime = `video/mp4; codecs="mp4a.40.2,avc1.64001f"`
+      const sb = this._sb = ms.addSourceBuffer(mime)
+      sb.addEventListener('updateend', () => {
+        const xp = this._addSourceIdlePromise
+        if (xp) {
+          this._addSourceIdlePromise = undefined
+          xp.resolve()
+        }
+      })
+      sourceOpenXp.resolve()
+    }
+
+    ms.addEventListener('sourceopen', onSourceOpen)
+
+    this._loopAddSource(this._loopId)
+  }
+
+  getBufferRange() {
+    const sb = this._sb
+    if (!sb) return
+    const { buffered } = sb
+    const { length } = buffered
+    if (!length) return
+    return {
+      start: buffered.start(0),
+      end: buffered.end(0),
+    }
+  }
+
+  // get sourceBuffer() {
+  //   const ret = this._sb
+  //   if (!ret) throw new Error(`Sourcebuffer is not created`)
+  //   return ret
+  // }
+
+  ready() {
+    return this._sourceOpenPromise
+  }
+
+  async reset() {
+    if (this._ms.readyState !== 'open') {
+      return this._sourceOpenPromise
+    }
+    const sb = this._sb
+    if (!sb) return
+    const loopId = ++this._loopId
+    this._demuxer.destroy()
+    this._demuxer = new Demuxer()
+
+    while (true) {
+      if (this._sb?.updating) {
+        await this._getSourceIdlePromise()
+        continue
+      }
+      break
+    }
+    if (loopId !== this._loopId) return
+
+    this._ms.duration = 0
+
+    const { buffered } = sb
+    const { length } = buffered
+    if (length) {
+      while (true) {
+        if (this._sb?.updating) {
+          await this._getSourceIdlePromise()
+          continue
+        }
+        break
+      }
+      if (loopId !== this._loopId) return
+
+      const end = buffered.end(length - 1)
+      sb.remove(0, buffered.end(length - 1))
+    }
+    this._loopAddSource(this._loopId)
+  }
+
+  async removeBefore(startTimepoint: number, endTimepoint: number) {
+    const sb = this._sb
+    if (!sb) return
+
+    startTimepoint = Math.max(0, startTimepoint)
+    if (startTimepoint >= endTimepoint) return
+
+    const loopId = this._loopId
+
+    while (true) {
+      if (this._sb?.updating) {
+        await this._getSourceIdlePromise()
+        continue
+      }
+      break
+    }
+    if (loopId !== this._loopId) return
+
+    if (sb.buffered.length) {
+      sb.remove(startTimepoint, endTimepoint)
+    }
+  }
+
+  add(buffer: Uint8Array, duration: number) {
+    this._demuxer.input.write({ buffer, duration })
+  }
+
+  async destroy() {
+    if (this._isDestroyed) return
+    this._isDestroyed = true
+    if (this._ms.readyState === 'open') {
+      while (true) {
+        if (this._sb?.updating) {
+          await this._getSourceIdlePromise()
+          continue
+        }
+        break
+      }
+      this._ms.endOfStream()
+    }
+  }
+
+  private async _loopAddSource(loopId: number) {
+    try {
+      while (true) {
+        if (this._isDestroyed) return
+        if (this._loopId !== loopId) return
+
+        const output = await this._demuxer.output.read()
+        // output is closed, end loop
+        if (output.done) return
+
+        if (this._isDestroyed) return
+        if (this._loopId !== loopId) return
+
+        while (true) {
+          if (this._sb?.updating) {
+            await this._getSourceIdlePromise()
+            continue
+          }
+          break
+        }
+
+        if (this._isDestroyed) return
+        if (this._loopId !== loopId) return
+
+        const { buffer, duration } = output.value
+        const ms = this._ms
+        ms.duration = (ms.duration || 0) + duration
+        this._sb!.appendBuffer(buffer)
+      }
+    } catch (e) {
+      console.error(e)
+      if (this._loopId !== loopId) return
+      await this.destroy()
+    }
+  }
+
+  private _getSourceIdlePromise() {
+    let xp = this._addSourceIdlePromise
+    if (!xp) this._addSourceIdlePromise = xp = createExternalPromise()
+    return xp.promise
+  }
+
+  // private async _ensureWritable() {
+  //   while (true) {
+  //     if (this._sb?.updating) {
+  //       let xp = this._addSourceIdlePromise
+  //       if (!xp) {
+  //         this._addSourceIdlePromise = xp = createExternalPromise()
+  //       }
+  //       await xp.promise
+  //       continue
+  //     }
+  //     return
+  //   }
+  // }
+}
+
+interface BufferPayload {
+  readonly buffer: Uint8Array
+  readonly duration: number
+}
+
+class Demuxer {
+  private _isDestroyed: boolean
+  private _count: number
+  private readonly _transmuxer: muxjs.mp4.Transmuxer
+  private readonly _inputStream: PipeStream<BufferPayload>
+  private readonly _muxIdle: PipeStream<void>
+  private readonly _outputStream: PipeStream<BufferPayload>
+
+  constructor() {
+    this._isDestroyed = false
+
+    this._count = 0
 
     // reusing transmuxer to keep correct timeoffset
     this._transmuxer = new muxjs.mp4.Transmuxer()
 
-    this._muxStream = new Stream()
+    this._inputStream = new PipeStream()
 
-    this._addSourceIdle = new Stream()
+    this._muxIdle = new PipeStream()
 
-    ms.addEventListener('sourceopen', () => {
-      URL.revokeObjectURL(url)
-      if (this._isDestroyed) return
-      const mime = `video/mp4;codecs=avc1.42001e`
-      const sb = this._sb = ms.addSourceBuffer(mime)
-      sb.addEventListener('updateend', () => {
-        this._addSourceIdle.write()
-      })
-      this._addSourceIdle.write()
-    })
+    this._outputStream = new PipeStream()
 
-    this._transmuxer.on('data', segment => {
-      if (this._isDestroyed) return
-      if (this._count++) {
-        this._muxStream.write(new Uint8Array(segment.data))
-      } else {
-        const data = new Uint8Array(segment.initSegment.byteLength + segment.data.byteLength);
-        data.set(segment.initSegment, 0);
-        data.set(segment.data, segment.initSegment.byteLength);
-        this._muxStream.write(data)
-      }
-    })
+    this._transmuxer.on('error', console.error)
+
+    this._muxIdle.write()
 
     this._loop()
   }
 
-  add(typedArray: Uint8Array) {
-    const transmuxer = this._transmuxer
-    transmuxer.push(typedArray);
-    transmuxer.flush()
+
+  get input() {
+    return this._inputStream
+  }
+
+  get output() {
+    return this._outputStream
   }
 
   destroy() {
     if (this._isDestroyed) return
     this._isDestroyed = true
-    call(async () => {
-      const ms = this._ms
-      const sb = this._sb
-      this._muxStream.end()
-      const addSourceStream = this._addSourceIdle
-      if (ms.readyState === 'open') {
-        if (sb.updating) {
-          await addSourceStream.readLast() || addSourceStream.read()
-        }
-        addSourceStream.end()
-        this._ms.endOfStream()
-      }
-    })
   }
 
   private async _loop() {
@@ -84,17 +261,42 @@ export class MSE {
       while (true) {
         if (this._isDestroyed) return
 
-        const yields = await Promise.all([
-          this._muxStream.read(),
-          this._addSourceIdle.read(),
-        ] as const)
+        const idle = await this._muxIdle.read()
+        // idle is closed, end loop
+        if (idle.done) return
 
         if (this._isDestroyed) return
 
-        const { value } = mergeStreamResults(yields)
-        if (!value) break
-        const [buffer] = value
-        this._sb.appendBuffer(buffer)
+        const input = await this._inputStream.read()
+        // input stream is closed, end loop
+        if (input.done) return
+
+        if (this._isDestroyed) return
+
+        const count = this._count++
+        const { buffer, duration } = input.value
+        const transmuxer = this._transmuxer
+        if (!count) {
+          transmuxer.on('data', segment => {
+            this._transmuxer.off('data')
+            if (this._isDestroyed) return
+            const data = new Uint8Array(segment.initSegment.byteLength + segment.data.byteLength)
+            data.set(segment.initSegment, 0)
+            data.set(segment.data, segment.initSegment.byteLength)
+            this._outputStream.write({ buffer: data, duration })
+            this._muxIdle.write()
+          })
+        } else {
+          transmuxer.on('data', segment => {
+            this._transmuxer.off('data')
+            if (this._isDestroyed) return
+            const data = new Uint8Array(segment.data)
+            this._outputStream.write({ buffer: data, duration })
+            this._muxIdle.write()
+          })
+        }
+        transmuxer.push(buffer)
+        transmuxer.flush()
       }
     } catch (e) {
       console.error(e)
@@ -102,33 +304,3 @@ export class MSE {
     }
   }
 }
-
-
-// // Create your transmuxer:
-// //  initOptions is optional and can be omitted at this time.
-// const transmuxer = new muxjs.mp4.Transmuxer()
-
-// // Create an event listener which will be triggered after the transmuxer processes data:
-// //  'data' events signal a new fMP4 segment is ready
-// transmuxer.on('data', function (segment) {
-//   // This code will be executed when the event listener is triggered by a Transmuxer.push() method execution.
-//   // Create an empty Uint8Array with the summed value of both the initSegment and data byteLength properties.
-//   let data = new Uint8Array(segment.initSegment.byteLength + segment.data.byteLength);
-
-//   // Add the segment.initSegment (ftyp/moov) starting at position 0
-//   data.set(segment.initSegment, 0);
-
-//   // Add the segment.data (moof/mdat) starting after the initSegment
-//   data.set(segment.data, segment.initSegment.byteLength);
-
-//   // Uncomment this line below to see the structure of your new fMP4
-//   // console.log(muxjs.mp4.tools.inspect(data));
-
-//   // Add your brand new fMP4 segment to your MSE Source Buffer
-//   sourceBuffer.appendBuffer(data);
-// })
-
-// // When you push your starting MPEG-TS segment it will cause the 'data' event listener above to run.
-// // It is important to push after your event listener has been defined.
-// transmuxer.push(transportStreamSegment)
-// transmuxer.flush()

@@ -61,11 +61,16 @@ class WindowManager {
     return this._roomPlayers.get(roomId)
   }
 
-  async openRoomPlayer(roomId: number) {
+  openRoomPlayer(roomId: number) {
     const players = this._roomPlayers
     let win = players.get(roomId)
     if (!win) {
       win = this._createRoomPlayer(roomId)
+      win.on('close', () => {
+        if (players.get(roomId) === win) {
+          players.delete(roomId)
+        }
+      })
       players.set(roomId, win)
       this._emit('afterCreateWindow')(win)
     }
@@ -75,7 +80,7 @@ class WindowManager {
 
   private _createRoomPlayer(roomId: number) {
     const win = createWindow()
-    this.redirectWindow(win, `/player/${roomId}`)
+    this.redirectWindow(win, `/room-player/${roomId}`)
     return win
   }
 
@@ -107,7 +112,6 @@ function createWindow(options?: BrowserWindowConstructorOptions) {
     width,
     height,
     frame: false,
-    titleBarStyle: 'customButtonsOnHover',
     webPreferences: {
       nodeIntegration: true,
       webSecurity: false,
