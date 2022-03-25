@@ -49,7 +49,7 @@
     "chalk": "^4.0.0",
     "css-loader": "^3.5.3",
     "date-fns": "^2.14.0",
-    "electron": "^9.0.2",
+    "electron": "^13.6.6",
     "eslint": "^7.2.0",
     "eslint-plugin-react": "^7.20.0",
     "happypack": "^5.0.1",
